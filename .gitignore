@@ -1,0 +1,10 @@
+build/
+*.obj
+*.pdb
+*.ilk
+*.map
+*.log
+*.user
+.vs/
+out/
+testdata/
