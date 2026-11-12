@@ -29,9 +29,10 @@ M0–M4 are complete. The app builds as one x64 executable (~610 KiB) and has:
   with folder-first sorting, column sorting, draggable column separators,
   keyboard navigation, type-ahead, multi-select, inline rename, and a dark
   scrollbar;
-- filesystem browsing, hidden-file toggle, new folder, delete to Recycle Bin,
-  cut/copy/paste, copy path, properties, Open With, Show in Explorer, and Open in
-  Terminal (67t next to the EXE/sibling build, then Windows Terminal, then cmd);
+- filesystem browsing, hidden-file toggle, new folder, new file, delete to Recycle
+  Bin, cut/copy/paste (colliding pastes become `name_2`, `name_3`, ...), copy
+  path, properties, Open With, Show in Explorer, and Open in Terminal (67t next
+  to the EXE/sibling build, then Windows Terminal, then cmd);
 - optional per-user default folder handler: File → Set as Default File Manager
   (with a restore-to-Explorer action and a saved backup of the prior values);
 - ZIP archives opened as folders, nested archive navigation, Ctrl+E extraction
@@ -43,7 +44,7 @@ M0–M4 are complete. The app builds as one x64 executable (~610 KiB) and has:
   single-instance handoff, and a headless self-test.
 
 Known gaps: drive list for “This PC” (it opens the Windows drive root), archive
-creation, batch rename, recursive search, preview/inspector, and archive drag-out.
+creation, batch rename, preview/inspector, and archive drag-out.
 
 ## Build
 
@@ -87,6 +88,7 @@ src/
   pathbar.*         breadcrumbs, address edit, transient message
   searchbar.*       bottom filter bar (Ctrl+F) and scope toggle
   filelist.*        virtualized details view, selection, rename, OLE drop/drag
+  dragout.*         custom CF_HDROP IDataObject/IDropSource for drag-out
   menubar.*         owner-drawn dark popup menu host
   theme.h           palette and UI metrics
   location.*        filesystem vs archive location model and path parsing
@@ -177,8 +179,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-selftest.ps1
 directory listing and hidden files, recursive search/limits, sorting, unique
 names, filesystem and archive location parsing, archive up/join/display, session
 and settings (including view mode, font face/size, and search-scope) round trips,
-single-instance payloads, ZIP creation/listing/extraction/extract-all/search, and
-invalid paths. Expect `summary passed=40 failed=0`.
+single-instance payloads, drag-out `CF_HDROP` data, ZIP
+creation/listing/extraction/extract-all/search, and invalid paths. Expect
+`summary passed=41 failed=0`.
 
 Manual smoke (only when necessary, never in automated runs): tabs, breadcrumbs,
 Ctrl+F bottom filter and scope toggle, Ctrl+wheel zoom, category burger, rename,
@@ -193,6 +196,10 @@ drop, DPI 125/150/200%, second launch.
   URI lists or virtual file descriptors. The drop target handles `CF_HDROP`,
   `FileGroupDescriptorW`/`FileContents`, `HTML Format`, `text/uri-list`, and
   `CF_UNICODETEXT`.
+- Drag-out uses a custom `CF_HDROP` data object (`dragout.cpp`); do not go back to
+  `SHCreateDataObject` with absolute PIDLs, which non-shell targets (browsers,
+  Telegram) ignore. UIPI still blocks drops into elevated windows and from an
+  elevated 67fm into non-elevated targets.
 - Browser image URLs can require cookies/referers; a failed download is reported
   rather than silently ignored.
 - Default-file-manager registration overrides the per-user `Directory\shell` and

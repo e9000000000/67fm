@@ -129,6 +129,20 @@ over the name cell, and commits on Enter/focus loss. In details mode, the header
 column boundaries are drag targets; widths are stored as normalized ratios in
 `settings.json`, so they survive window resizes and DPI changes.
 
+## File operations
+
+New Folder (`Ctrl+Shift+N`) creates `New folder` (or the next free
+`New folder (2)`) and starts inline rename. New File (`Ctrl+Alt+N`) creates an
+empty `New file.txt` the same way.
+
+Paste uses `CopyOrMovePaths` in `util.cpp`. A normal multi-item copy is a single
+`SHFileOperationW` call. If any destination name already exists, the copy is done
+one item at a time so each collision gets a numbered name from
+`UniqueNumberedPath`: `name_2`, `name_3`, ... (`file_2.txt` for files). Copying an
+item into its own folder therefore yields `folder_2` instead of a replace prompt.
+Moves are left to the shell's normal conflict handling, and a move into the
+source folder is skipped.
+
 ## ZIP handling
 
 `third_party/miniz` is vendored unmodified (MIT). `ZipArchive` owns the `FILE*`
@@ -167,8 +181,17 @@ user-chosen folder.
 otherwise the current folder. Archive locations reject writes. Files are passed
 to `SHFileOperationW` (copy or move). URLs go to the downloader.
 
-Drag-out parses each selected real path into an absolute PIDL and uses
-`SHCreateDataObject` + `SHDoDragDrop`. Archive entries are not draggable yet.
+Drag-out is handled by `dragout.cpp`. It builds a small custom `IDataObject`
+(replacing the earlier `SHCreateDataObject` helper) that exposes:
+
+1. `CF_HDROP` — the file list, as `DROPFILES` + wide, double-null-terminated paths.
+2. `Preferred DropEffect` — `DROPEFFECT_COPY`.
+3. `CF_UNICODETEXT` — fallback for text-oriented targets.
+
+`DoDragDrop` runs with a custom `IDropSource` (Escape cancels, releasing the
+button drops). This is what makes drag-out work with non-shell targets such as
+browsers (file uploads) and Telegram, which expect a plain `CF_HDROP` payload.
+Archive entries are not draggable yet.
 
 ## Downloads
 

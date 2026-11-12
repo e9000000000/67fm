@@ -39,12 +39,32 @@ void CenterWindow(HWND hwnd, int width, int height) {
     SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
+bool FocusIsEdit() {
+    HWND focus = GetFocus();
+    if (!focus) {
+        return false;
+    }
+    wchar_t className[32] = {};
+    GetClassNameW(focus, className, static_cast<int>(std::size(className)));
+    return _wcsicmp(className, L"Edit") == 0;
+}
+
 std::wstring HomeFolder() {
     std::wstring home = KnownFolder(FOLDERID_Profile);
     if (home.empty()) {
         home = L"C:\\";
     }
     return home;
+}
+
+bool OpenClipboardWithRetry(HWND owner) {
+    for (int attempt = 0; attempt < 6; ++attempt) {
+        if (OpenClipboard(owner)) {
+            return true;
+        }
+        Sleep(5);
+    }
+    return false;
 }
 
 bool PutClipboardFiles(HWND owner, const std::vector<std::wstring>& paths, bool move) {
@@ -76,7 +96,7 @@ bool PutClipboardFiles(HWND owner, const std::vector<std::wstring>& paths, bool 
     *text = L'\0';
     GlobalUnlock(memory);
 
-    if (!OpenClipboard(owner)) {
+    if (!OpenClipboardWithRetry(owner)) {
         GlobalFree(memory);
         return false;
     }
@@ -107,7 +127,7 @@ bool PutClipboardFiles(HWND owner, const std::vector<std::wstring>& paths, bool 
 bool GetClipboardFiles(std::vector<std::wstring>& paths, bool& move) {
     paths.clear();
     move = false;
-    if (!IsClipboardFormatAvailable(CF_HDROP) || !OpenClipboard(nullptr)) {
+    if (!IsClipboardFormatAvailable(CF_HDROP) || !OpenClipboardWithRetry(nullptr)) {
         return false;
     }
     if (HANDLE handle = GetClipboardData(CF_HDROP)) {
@@ -333,7 +353,12 @@ void App::createAccelerators() {
         {FVIRTKEY | FCONTROL, 'L', kCmdAddress},
         {FVIRTKEY | FCONTROL, 'F', kCmdFind},
         {FVIRTKEY | FCONTROL, 'G', kCmdMenuGo},
+        {FVIRTKEY | FCONTROL, 'A', kCmdSelectAll},
+        {FVIRTKEY | FCONTROL, 'C', kCmdCopy},
+        {FVIRTKEY | FCONTROL, 'X', kCmdCut},
+        {FVIRTKEY | FCONTROL, 'V', kCmdPaste},
         {FVIRTKEY | FCONTROL | FSHIFT, 'N', kCmdNewFolder},
+        {FVIRTKEY | FCONTROL | FALT, 'N', kCmdNewFile},
         {FVIRTKEY | FCONTROL, 'E', kCmdExtract},
         {FVIRTKEY | FCONTROL, VK_OEM_PLUS, kCmdZoomIn},
         {FVIRTKEY | FCONTROL | FSHIFT, VK_OEM_PLUS, kCmdZoomIn},
@@ -390,6 +415,7 @@ void App::showMenuCategory(int category) {
     case 0:  // File
         add(kCmdNewTab, L"New Tab", true, L"Ctrl+T");
         add(kCmdNewFolder, L"New Folder", state.hasTab, L"Ctrl+Shift+N");
+        add(kCmdNewFile, L"New File", state.hasTab, L"Ctrl+Alt+N");
         separator();
         add(kCmdOpen, L"Open", state.hasSelection, L"Enter");
         add(kCmdOpenWith, L"Open With...", state.hasSelection && !state.canExtract);
@@ -451,6 +477,7 @@ void App::showMenuCategory(int category) {
         add(kCmdDocuments, L"Documents", true);
         add(kCmdDownloads, L"Downloads", true);
         add(kCmdPictures, L"Pictures", true);
+        add(kCmdVideos, L"Videos", true);
         add(kCmdHome, L"Home", true);
         separator();
         add(kCmdThisPc, L"This PC", true);
@@ -1119,6 +1146,29 @@ void App::newFolder() {
     setStatusMessage(L"Created " + name);
 }
 
+void App::newFile() {
+    Tab* tab = activeTab();
+    if (!tab) {
+        return;
+    }
+    if (tab->location.archive) {
+        ShowInfo(hwnd_, L"Cannot create files inside a ZIP archive.");
+        return;
+    }
+    const std::wstring path = UniquePath(tab->location.fsPath, L"New file.txt", false);
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        ShowError(hwnd_, GetErrorText(L"Cannot create " + path, GetLastError()));
+        return;
+    }
+    CloseHandle(file);
+    loadTab(*tab, true);
+    const std::wstring name = FileNameOf(path);
+    fileList_.beginRenameName(name);
+    setStatusMessage(L"Created " + name);
+}
+
 void App::renameSelection() {
     Tab* tab = activeTab();
     if (!tab) {
@@ -1368,6 +1418,7 @@ void App::showFileContextMenu(POINT point, int viewRow) {
     add(kCmdDelete, L"Delete", hasSelection && !archive, L"Del");
     separator();
     add(kCmdNewFolder, L"New Folder", !archive, L"Ctrl+Shift+N");
+    add(kCmdNewFile, L"New File", !archive, L"Ctrl+Alt+N");
     add(kCmdCopyPath, L"Copy Path", hasSelection);
     add(kCmdProperties, L"Properties", hasSelection || tab != nullptr, L"Alt+Enter");
     separator();
@@ -1814,13 +1865,25 @@ void App::onCommand(UINT id) {
         openTerminal();
         break;
     case kCmdCut:
-        copySelection(true);
+        if (FocusIsEdit()) {
+            SendMessageW(GetFocus(), WM_CUT, 0, 0);
+        } else {
+            copySelection(true);
+        }
         break;
     case kCmdCopy:
-        copySelection(false);
+        if (FocusIsEdit()) {
+            SendMessageW(GetFocus(), WM_COPY, 0, 0);
+        } else {
+            copySelection(false);
+        }
         break;
     case kCmdPaste:
-        paste();
+        if (FocusIsEdit()) {
+            SendMessageW(GetFocus(), WM_PASTE, 0, 0);
+        } else {
+            paste();
+        }
         break;
     case kCmdRename:
         renameSelection();
@@ -1831,8 +1894,15 @@ void App::onCommand(UINT id) {
     case kCmdNewFolder:
         newFolder();
         break;
+    case kCmdNewFile:
+        newFile();
+        break;
     case kCmdSelectAll:
-        fileList_.selectAll();
+        if (FocusIsEdit()) {
+            SendMessageW(GetFocus(), EM_SETSEL, 0, -1);
+        } else {
+            fileList_.selectAll();
+        }
         break;
     case kCmdInvertSelection:
         fileList_.invertSelection();
@@ -1885,6 +1955,7 @@ void App::onCommand(UINT id) {
     case kCmdDocuments:
     case kCmdDownloads:
     case kCmdPictures:
+    case kCmdVideos:
     case kCmdHome:
     case kCmdThisPc: {
         std::wstring path;
@@ -1892,6 +1963,7 @@ void App::onCommand(UINT id) {
         if (id == kCmdDocuments) path = KnownFolder(FOLDERID_Documents);
         if (id == kCmdDownloads) path = KnownFolder(FOLDERID_Downloads);
         if (id == kCmdPictures) path = KnownFolder(FOLDERID_Pictures);
+        if (id == kCmdVideos) path = KnownFolder(FOLDERID_Videos);
         if (id == kCmdHome) path = KnownFolder(FOLDERID_Profile);
         if (id == kCmdThisPc) {
             wchar_t windows[MAX_PATH] = {};

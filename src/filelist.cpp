@@ -1,5 +1,6 @@
 #include "filelist.h"
 #include "commands.h"
+#include "dragout.h"
 
 #include <windowsx.h>
 #include <ole2.h>
@@ -1075,33 +1076,9 @@ void FileList::startDragOut() {
         dragRow_ = -1;
         return;
     }
-    std::vector<PIDLIST_ABSOLUTE> pidls;
-    for (const auto& path : paths) {
-        PIDLIST_ABSOLUTE pidl = nullptr;
-        if (SUCCEEDED(SHParseDisplayName(path.c_str(), nullptr, &pidl, 0, nullptr)) && pidl) {
-            pidls.push_back(pidl);
-        }
-    }
-    if (!pidls.empty()) {
-        std::vector<PCUITEMID_CHILD> children;
-        children.reserve(pidls.size());
-        for (PIDLIST_ABSOLUTE pidl : pidls) {
-            children.push_back(reinterpret_cast<PCUITEMID_CHILD>(pidl));
-        }
-        IDataObject* data = nullptr;
-        if (SUCCEEDED(SHCreateDataObject(nullptr, static_cast<UINT>(children.size()),
-                                         children.data(), nullptr, IID_IDataObject,
-                                         reinterpret_cast<void**>(&data)))) {
-            DWORD effect = 0;
-            SHDoDragDrop(hwnd_, data, nullptr,
-                         DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &effect);
-            data->Release();
-            notify(filelist_events::kDragFinished, effect == DROPEFFECT_MOVE ? 1 : 0);
-        }
-    }
-    for (PIDLIST_ABSOLUTE pidl : pidls) {
-        CoTaskMemFree(pidl);
-    }
+    const DWORD effect = BeginFileDrag(paths);
+    notify(filelist_events::kDragFinished,
+           (effect & DROPEFFECT_MOVE) ? 1 : 0);
     draggingOut_ = false;
     dragRow_ = -1;
     invalidate();

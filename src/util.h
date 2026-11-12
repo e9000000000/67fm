@@ -29,6 +29,9 @@ std::wstring JoinPath(const std::wstring& base, const std::wstring& name);
 std::wstring ParentDirectory(const std::wstring& path);
 std::wstring UniquePath(const std::wstring& directory, const std::wstring& name,
                         bool wantDirectory = false);
+// Same as UniquePath but with Windows-style numeric suffixes: name_2, name_3, ...
+std::wstring UniqueNumberedPath(const std::wstring& directory, const std::wstring& name,
+                                bool wantDirectory = false);
 std::wstring SanitizeFileName(const std::wstring& name);
 std::wstring FileNameFromUrl(const std::wstring& url);
 

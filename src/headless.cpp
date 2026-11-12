@@ -1,13 +1,16 @@
 #include "headless.h"
 
 #include <windows.h>
+#include <objidl.h>
 
 #include <algorithm>
+#include <cwchar>
 #include <iterator>
 #include <string>
 #include <vector>
 
 #include "download.h"
+#include "dragout.h"
 #include "fs.h"
 #include "ipc.h"
 #include "json.h"
@@ -202,7 +205,14 @@ int RunSelfTest(const std::wstring& logPath) {
         }
 
         const std::wstring unique = UniquePath(folder, L"one.txt");
-        log.result(L"unique path", FileNameOf(unique) == L"one (2).txt", FileNameOf(unique));
+        const std::wstring numberedFile = UniqueNumberedPath(folder, L"one.txt", false);
+        const std::wstring numberedFolder = UniqueNumberedPath(folder, L"sub", true);
+        log.result(L"unique path",
+                   FileNameOf(unique) == L"one (2).txt" &&
+                       FileNameOf(numberedFile) == L"one_2.txt" &&
+                       FileNameOf(numberedFolder) == L"sub_2",
+                   FileNameOf(unique) + L" / " + FileNameOf(numberedFile) + L" / " +
+                       FileNameOf(numberedFolder));
 
         Location archiveRoot;
         log.result(L"parse archive root", ParseLocation(JoinPath(root, L"archive.zip"),
@@ -286,6 +296,40 @@ int RunSelfTest(const std::wstring& logPath) {
             const std::wstring payload = BuildPathPayload({});
             const auto paths = ParsePathPayload(payload.c_str(), payload.size());
             return payload.size() == 1 && paths.empty();
+        }());
+        log.result(L"drag out data object", [&]() {
+            const std::vector<std::wstring> paths = {L"C:\\one\\a.txt", L"C:\\two\\b c.png"};
+            IDataObject* data = CreateFileDataObject(paths);
+            if (!data) return false;
+            FORMATETC format{};
+            format.cfFormat = static_cast<CLIPFORMAT>(CF_HDROP);
+            format.dwAspect = DVASPECT_CONTENT;
+            format.lindex = -1;
+            format.tymed = TYMED_HGLOBAL;
+            bool ok = data->QueryGetData(&format) == S_OK;
+            STGMEDIUM medium{};
+            if (ok) {
+                ok = data->GetData(&format, &medium) == S_OK &&
+                     medium.tymed == TYMED_HGLOBAL && medium.hGlobal != nullptr;
+                if (ok) {
+                    auto* drop = static_cast<DROPFILES*>(GlobalLock(medium.hGlobal));
+                    ok = drop != nullptr && drop->fWide;
+                    if (drop) {
+                        const auto* text = reinterpret_cast<const wchar_t*>(
+                            reinterpret_cast<const BYTE*>(drop) + drop->pFiles);
+                        std::vector<std::wstring> read;
+                        for (const wchar_t* cursor = text; *cursor;
+                             cursor += wcslen(cursor) + 1) {
+                            read.emplace_back(cursor);
+                        }
+                        ok = ok && read == paths;
+                        GlobalUnlock(medium.hGlobal);
+                    }
+                    ReleaseStgMedium(&medium);
+                }
+            }
+            data->Release();
+            return ok;
         }());
 
         const std::wstring zipPath = JoinPath(root, L"test.zip");

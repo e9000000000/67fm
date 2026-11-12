@@ -19,7 +19,8 @@ fast: no browser engine, no installer, no telemetry, no background indexer.
   Large icons → Extra large icons. File previews/thumbnails appear in every view
   mode. **List Font** and **Interface Font** are separate dialogs in the View
   menu; the UI font covers tabs, menus, path bar, and search bar.
-- **File operations.** Cut/copy/paste, new folder, delete to the Recycle Bin,
+- **File operations.** Cut/copy/paste (a pasted item that collides gets a
+  `name_2`, `name_3`, ... name), new folder, new file, delete to the Recycle Bin,
   properties, Open With, Show in Explorer, Open in Terminal, copy path.
 - **Optional default file manager.** File → Set as Default File Manager makes
   `start .` and other folder opens use 67fm for this Windows user; Restore Windows
@@ -71,6 +72,7 @@ The self-test is headless (`build\67fm.exe --selftest`).
 | `Ctrl+Alt+T` | Open current folder in terminal |
 | `F5` | Refresh |
 | `Ctrl+Shift+N` | New folder |
+| `Ctrl+Alt+N` | New file |
 | `Ctrl+E` | Extract from ZIP |
 | `F2` | Rename |
 | `Del` | Delete to Recycle Bin |

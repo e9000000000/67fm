@@ -106,6 +106,7 @@ private:
     void paste();
     void deleteSelection();
     void newFolder();
+    void newFile();
     void renameSelection();
     void commitRename(int allIndex);
     void extractSelection(bool all);

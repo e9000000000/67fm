@@ -27,8 +27,10 @@ deliberately not copied.
 - Open, Open With, properties, Show in Explorer, copy path.
 - Open current/selected folder in a terminal (`Ctrl+Alt+T`).
 - Per-user Set as Default File Manager / Restore Windows Explorer Default.
-- New folder, inline rename, recycle-bin delete, cut/copy/paste.
-- Drag files in from Explorer and out to Explorer.
+- New folder, new file, inline rename, recycle-bin delete, cut/copy/paste with
+  `name_2`, `name_3`, ... names for colliding pastes.
+- Go menu includes Desktop, Documents, Downloads, Pictures, Videos, Home, This PC.
+- Drag files in from Explorer and out to Explorer, browsers, and chat apps.
 
 ### M2 — tabs and sessions (done)
 
@@ -58,7 +60,6 @@ deliberately not copied.
 - Batch rename.
 - Preview/inspector overlay without adding a side panel.
 - Archive drag-out (extract to temp and provide `CF_HDROP`).
-- Optional custom `IDataObject` for drag-out to remove shell helper dependence.
 - Full keyboard/mouse pass at 125/150/200% DPI.
 
 ## Non-goals

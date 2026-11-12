@@ -153,6 +153,7 @@ void MenuBar::rebuildMenus() {
     file.title = L"File";
     file.items.push_back(MakeItem(kCmdNewTab, L"New Tab", L"Ctrl+T"));
     file.items.push_back(MakeItem(kCmdNewFolder, L"New Folder", L"Ctrl+Shift+N", has));
+    file.items.push_back(MakeItem(kCmdNewFile, L"New File", L"Ctrl+Alt+N", has));
     file.items.push_back(MakeSeparator());
     file.items.push_back(MakeItem(kCmdOpen, L"Open", L"Enter", selection));
     file.items.push_back(MakeItem(kCmdOpenExplorer, L"Show in Explorer", L"", selection));
@@ -209,6 +210,7 @@ void MenuBar::rebuildMenus() {
     go.items.push_back(MakeItem(kCmdDocuments, L"Documents"));
     go.items.push_back(MakeItem(kCmdDownloads, L"Downloads"));
     go.items.push_back(MakeItem(kCmdPictures, L"Pictures"));
+    go.items.push_back(MakeItem(kCmdVideos, L"Videos"));
     go.items.push_back(MakeItem(kCmdHome, L"Home"));
     go.items.push_back(MakeSeparator());
     go.items.push_back(MakeItem(kCmdThisPc, L"This PC"));

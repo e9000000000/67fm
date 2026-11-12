@@ -29,7 +29,7 @@ the summary is not `failed=0`.
   count.
 - Invalid path handling.
 
-Expected summary: `summary passed=40 failed=0`.
+Expected summary: `summary passed=41 failed=0`.
 
 ## Manual (only when needed)
 
@@ -42,12 +42,15 @@ Do not use GUI automation in automated runs. For a release smoke test:
 - Open View → List Font / Interface Font and change face/size.
 - Confirm icon views show image/file previews.
 - Drag details column separators and confirm widths persist after restart.
-- Press Ctrl+G and confirm the Go menu opens.
+- Press Ctrl+G and confirm the Go menu opens, including Videos.
 - Use Open in Terminal (Ctrl+Alt+T) on a folder.
 - Set as Default File Manager, run `start .` in cmd, then restore Explorer.
+- Create a folder and a file with New Folder / New File, then rename inline.
+- Copy an item into its own folder and confirm `name_2`, then `name_3`.
 - Create/rename/delete an item; confirm Recycle Bin behavior.
 - Open a ZIP, descend into a folder, extract one file and all files.
-- Drag files from Explorer in, drag selected files out.
+- Drag files from Explorer in, drag selected files out to Explorer, a browser file
+  input, and a Telegram chat.
 - Drag an image from a browser and confirm it lands in the current folder with a
   unique, safe name.
 - Restart and confirm tabs/scroll/sort/window placement restore.

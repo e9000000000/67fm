@@ -25,6 +25,7 @@ enum : unsigned int {
     kCmdRename,
     kCmdDelete,
     kCmdNewFolder,
+    kCmdNewFile,
     kCmdSelectAll,
     kCmdInvertSelection,
     kCmdCopyPath,
@@ -45,6 +46,7 @@ enum : unsigned int {
     kCmdDocuments,
     kCmdDownloads,
     kCmdPictures,
+    kCmdVideos,
     kCmdHome,
     kCmdThisPc,
 

@@ -408,7 +408,34 @@ std::wstring AddCopySuffix(const std::wstring& name, int number, bool directory)
     return name.substr(0, dot) + L" (" + std::to_wstring(number) + L")" + name.substr(dot);
 }
 
+std::wstring AddNumberedSuffix(const std::wstring& name, int number, bool directory) {
+    if (directory) {
+        return name + L"_" + std::to_wstring(number);
+    }
+    const size_t dot = name.find_last_of(L'.');
+    if (dot == std::wstring::npos || dot == 0) {
+        return name + L"_" + std::to_wstring(number);
+    }
+    return name.substr(0, dot) + L"_" + std::to_wstring(number) + name.substr(dot);
+}
+
 }  // namespace
+
+std::wstring UniqueNumberedPath(const std::wstring& directory, const std::wstring& name,
+                                bool wantDirectory) {
+    const std::wstring candidate = JoinPath(directory, name);
+    if (GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return candidate;
+    }
+    for (int i = 2; i < 10000; ++i) {
+        const std::wstring next = JoinPath(directory, AddNumberedSuffix(name, i, wantDirectory));
+        if (GetFileAttributesW(next.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            return next;
+        }
+    }
+    return JoinPath(directory, AddNumberedSuffix(
+                                   name, static_cast<int>(GetTickCount64()), wantDirectory));
+}
 
 std::wstring UniquePath(const std::wstring& directory, const std::wstring& name,
                         bool wantDirectory) {
@@ -705,25 +732,77 @@ void CopyOrMovePaths(HWND owner, const std::vector<std::wstring>& paths,
     if (paths.empty() || destination.empty() || !DirectoryExists(destination)) {
         return;
     }
-    std::wstring from;
+
+    struct Pending {
+        std::wstring source;
+        std::wstring name;
+        bool directory = false;
+    };
+    std::vector<Pending> pending;
+    bool needsUniqueNames = false;
     for (const auto& path : paths) {
-        from += path;
-        from.push_back(L'\0');
+        if (path.empty()) {
+            continue;
+        }
+        const std::wstring source = FullPath(path);
+        const bool directory = DirectoryExists(source);
+        if (!directory && !FileExists(source)) {
+            continue;
+        }
+        if (move && PathsEqual(DirectoryOf(source), destination)) {
+            continue;  // Already in the destination; moving onto itself is a no-op.
+        }
+        const std::wstring name = FileNameOf(source);
+        if (!move && GetFileAttributesW(JoinPath(destination, name).c_str()) !=
+                         INVALID_FILE_ATTRIBUTES) {
+            needsUniqueNames = true;
+        }
+        pending.push_back(Pending{source, name, directory});
     }
-    from.push_back(L'\0');
-    std::wstring to = destination;
-    to.push_back(L'\0');
-    to.push_back(L'\0');
-    SHFILEOPSTRUCTW op{};
-    op.hwnd = owner;
-    op.wFunc = move ? FO_MOVE : FO_COPY;
-    op.pFrom = from.c_str();
-    op.pTo = to.c_str();
-    op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMMKDIR;
-    const int result = SHFileOperationW(&op);
-    if (result != 0) {
-        ShowError(owner, std::wstring(move ? L"Move" : L"Copy") + L" failed (0x" +
-                                std::to_wstring(result) + L").");
+    if (pending.empty()) {
+        return;
+    }
+
+    const auto runOperation = [&](const std::vector<Pending>& batch, bool exactTarget) {
+        std::wstring from;
+        for (const auto& item : batch) {
+            from += item.source;
+            from.push_back(L'\0');
+        }
+        from.push_back(L'\0');
+        std::wstring to;
+        if (exactTarget) {
+            to = JoinPath(destination, batch.front().name);
+            if (!move) {
+                to = UniqueNumberedPath(destination, batch.front().name,
+                                        batch.front().directory);
+            }
+        } else {
+            to = destination;
+        }
+        to.push_back(L'\0');
+        to.push_back(L'\0');
+        SHFILEOPSTRUCTW op{};
+        op.hwnd = owner;
+        op.wFunc = move ? FO_MOVE : FO_COPY;
+        op.pFrom = from.c_str();
+        op.pTo = to.c_str();
+        op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMMKDIR;
+        const int result = SHFileOperationW(&op);
+        if (result != 0) {
+            ShowError(owner, std::wstring(move ? L"Move" : L"Copy") + L" failed (0x" +
+                                    std::to_wstring(result) + L").");
+        }
+    };
+
+    if (!needsUniqueNames) {
+        runOperation(pending, false);
+        return;
+    }
+    // Let the shell handle one item at a time so colliding copies get a fresh
+    // numbered name instead of a modal replace prompt.
+    for (const auto& item : pending) {
+        runOperation({item}, true);
     }
 }
 
